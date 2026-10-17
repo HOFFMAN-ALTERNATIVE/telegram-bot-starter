@@ -68,6 +68,14 @@ Add a feature: create `bot/handlers/<feature>.py` with its own `Router`, then in
 ruff check . && ruff format --check . && pytest -q
 ```
 
+## Container image
+
+Multi-arch (amd64/arm64) images are published to GitHub Container Registry on every release:
+
+```bash
+docker pull ghcr.io/hoffman-alternative/telegram-bot-starter:latest
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

@@ -6,6 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from bot.config import get_settings
+from bot.guard import AskGuard
 from bot.handlers import build_router
 from bot.llm import OllamaClient
 
@@ -26,7 +27,14 @@ async def main() -> None:
         settings.bot_token.get_secret_value(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    dp = Dispatcher(settings=settings, llm=llm)
+    guard = AskGuard(
+        settings.ask_allowed_user_ids, settings.ask_max_prompt_chars, settings.ask_max_concurrent
+    )
+    if llm and not guard.allowed:
+        logging.getLogger(__name__).warning(
+            "/ask is open to every Telegram user; set ASK_ALLOWED_USER_IDS to restrict it"
+        )
+    dp = Dispatcher(settings=settings, llm=llm, guard=guard)
     dp.include_router(build_router())
 
     try:

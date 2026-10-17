@@ -1,6 +1,7 @@
 import httpx
 
 from bot.config import Settings
+from bot.guard import AskGuard
 from bot.handlers import build_router
 from bot.keyboards import MenuCB, main_menu
 from bot.llm import OllamaClient
@@ -35,3 +36,34 @@ async def test_ollama_client():
     llm = OllamaClient("http://test", "any-model", client=client)
     assert await llm.chat("hello") == "hi"
     await llm.close()
+
+
+def test_settings_parse_allow_list(monkeypatch):
+    monkeypatch.setenv("BOT_TOKEN", "123:abc")
+    monkeypatch.setenv("ASK_ALLOWED_USER_IDS", "[42, 7]")
+    assert Settings(_env_file=None).ask_allowed_user_ids == [42, 7]
+
+
+def test_guard_allow_list_length_and_one_request_per_user():
+    g = AskGuard(allowed_user_ids=[1], max_prompt_chars=10)
+    assert g.rejection(None, "hi") is not None
+    assert "approved" in (g.rejection(2, "hi") or "")
+    assert "too long" in (g.rejection(1, "x" * 11) or "")
+    assert g.rejection(1, "hi") is None
+    g.acquire(1)
+    assert "previous" in (g.rejection(1, "hi") or "")
+    g.release(1)
+    assert g.rejection(1, "hi") is None
+
+
+def test_guard_without_allow_list_accepts_anyone():
+    assert AskGuard().rejection(999, "hello") is None
+
+
+def test_guard_global_concurrency_cap():
+    g = AskGuard(max_concurrent=2)
+    g.acquire(1)
+    g.acquire(2)
+    assert "busy" in (g.rejection(3, "hi") or "")
+    g.release(1)
+    assert g.rejection(3, "hi") is None
